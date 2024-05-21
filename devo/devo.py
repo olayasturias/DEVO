@@ -2,20 +2,24 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 
-from . import fastba
-from . import altcorr
-from . import lietorch
-from .lietorch import SE3
+# from . import fastba
+# from . import altcorr
+# from . import lietorch
+# from .lietorch import SE3
+import fastba
+import altcorr
+import lietorch
+from lietorch import SE3
 
 # from .net import VONet # TODO add net.py
-from .enet import eVONet
+from enet import eVONet
 from .utils import *
 from . import projective_ops as pops
 
 autocast = torch.cuda.amp.autocast
 Id = SE3.Identity(1, device="cuda")
 
-from utils.viz_utils import visualize_voxel
+from devo_utils.viz_utils import visualize_voxel
 
 
 class DEVO:
@@ -97,8 +101,8 @@ class DEVO:
         self.delta = {}
 
         self.viewer = None
-        if viz:
-            self.start_viewer()
+        # if viz:
+        #     self.start_viewer()
 
     def load_weights(self, network):
         # load network from checkpoint file
@@ -106,7 +110,7 @@ class DEVO:
             print(f"Loading from {network}")
             checkpoint = torch.load(network)
             # TODO infer dim_inet=self.dim_inet, dim_fnet=self.dim_fnet, dim=self.dim
-            self.network = VONet(patch_selector=self.cfg.PATCH_SELECTOR) if not self.evs else \
+            self.network = eVONet(patch_selector=self.cfg.PATCH_SELECTOR) if not self.evs else \
                 eVONet(dim_inet=self.dim_inet, dim_fnet=self.dim_fnet, dim=self.dim, patch_selector=self.cfg.PATCH_SELECTOR)
             if 'model_state_dict' in checkpoint:
                 self.network.load_state_dict(checkpoint['model_state_dict'])

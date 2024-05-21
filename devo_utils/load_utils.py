@@ -15,9 +15,17 @@ import torch.nn.functional as F
 
 import torchvision
 
-from utils.event_utils import EventSlicer, to_voxel_grid, RemoveHotPixelsVoxel
-from utils.viz_utils import visualize_voxel, visualize_N_voxels, render
-from utils.transform_utils import transform_rescale
+from devo_utils.event_utils import EventSlicer, to_voxel_grid, RemoveHotPixelsVoxel
+from devo_utils.viz_utils import visualize_voxel, visualize_N_voxels, render
+from devo_utils.transform_utils import transform_rescale
+
+def load_intrinsics_uw(path, camID=0):
+    with open(os.path.join(path, "calibration.json"), 'r') as f:
+        calibdata = json.load(f)["value0"]
+    calibdata = calibdata["intrinsics"][camID]["intrinsics"]
+    fx, fy, cx, cy = calibdata["fx"], calibdata["fy"], calibdata["cx"], calibdata["cy"]
+    intrinsics = [fx, fy, cx, cy]
+    return intrinsics
 
 def load_intrinsics_tumvie(path, camID=0):
     with open(os.path.join(path, "calib_undist.json"), 'r') as f:

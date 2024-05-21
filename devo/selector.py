@@ -6,7 +6,7 @@ import numpy as np
 import enum
 
 from torchvision.ops import batched_nms
-from . import altcorr
+import altcorr
 
 
 EPSILON = np.finfo(np.float32).tiny

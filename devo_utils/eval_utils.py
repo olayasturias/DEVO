@@ -19,7 +19,7 @@ from tabulate import tabulate
 from devo.plot_utils import plot_trajectory, fig_trajectory
 from devo.plot_utils import save_trajectory_tum_format
 
-from utils.viz_utils import show_image, visualize_voxel
+from devo_utils.viz_utils import show_image, visualize_voxel
 
 from evo.tools import file_interface
 import evo.main_ape as main_ape
