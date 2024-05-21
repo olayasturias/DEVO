@@ -87,7 +87,84 @@ def get_real_data_list(evs_slicer, tss_imgs_us, intrinsics, rectify_map, trafos,
 def get_real_data_list_parallel(evs_slicer, tss_imgs_us, intrinsics, rectify_map, trafos, dT_ms, Horig, Worig, return_dict):
     data_list = get_real_data_list(evs_slicer, tss_imgs_us, intrinsics, rectify_map, trafos, dT_ms, Horig, Worig)
     return_dict.update({tss_imgs_us[0]: data_list})
+
+
+def uw_evs_iterator(scenedir, camID=2, stride=1, rectify_map=None, H=720, W=1280, dT_ms=None, timing=False, parallel=False, cors=16):
+    assert camID == 2 or camID == 3
+    side = "left" if camID == 2 else "right"
     
+    intrinsics = load_intrinsics_tumvie(scenedir, camID=camID)
+    rectify_map = load_rmap_tumvie(scenedir, side=side)
+
+    h5file = glob.glob(osp.join(scenedir, f"*events_{side}.h5"))[0]
+    evs = h5py.File(h5file, "r")
+    evs_slicer = EventSlicer(evs)
+
+    tss_imgs_us = sorted(np.loadtxt(os.path.join(scenedir, f"{side}_images_undistorted", f"image_timestamps_{side}.txt")))
+    if dT_ms is None:
+        dT_ms = np.diff(tss_imgs_us).mean()/1e3   
+    assert dT_ms > 3 and dT_ms < 100
+    tss_imgs_us = tss_imgs_us[::stride]
+
+    trafos = []
+    if H != 720 or W != 1280:
+        resize = torchvision.transforms.Resize((H, W))
+        intrinsics = change_intrinsics_resize(intrinsics, H, W, Horig=720, Worig=1280)
+        print(f"Warning: Resizing tumvie voxels to ({H}, {W}). Visualize and check")
+    else:
+        resize = lambda x: x
+    trafos.append(resize)
+
+    hotpixfilter = True
+    if hotpixfilter:
+        trafos.append(RemoveHotPixelsVoxel(num_stds=6))
+
+    if timing:
+        t0 = torch.cuda.Event(enable_timing=True)
+        t1 = torch.cuda.Event(enable_timing=True)
+        t0.record()
+
+    if not parallel:
+        data_list = get_real_data_list(evs_slicer, tss_imgs_us, intrinsics, rectify_map, trafos, dT_ms, Horig=720, Worig=1280)
+    else:
+        tss_imgs_us_split = np.array_split(tss_imgs_us, cors)
+        processes = []
+        return_dict = multiprocessing.Manager().dict()
+        for i in range(cors):
+            p = multiprocessing.Process(target=get_real_data_list_parallel, args=(evs_slicer, tss_imgs_us_split[i].tolist(), intrinsics, rectify_map, trafos, dT_ms, 720, 1280, return_dict))
+            p.start()
+            processes.append(p)
+            
+        for p in processes:
+            p.join()
+        
+        if timing:
+            t0sort = torch.cuda.Event(enable_timing=True)
+            t1sort = torch.cuda.Event(enable_timing=True)
+            t0sort.record()
+
+        keys = np.array(return_dict.keys())
+        order = np.argsort(keys)
+        data_list = []
+        for k in keys[order]:
+            data_list.extend(return_dict[k])
+
+        if timing:
+            t1sort.record()
+            torch.cuda.synchronize()
+            print(f"Sorted {len(data_list)} tumvie voxels in {t0sort.elapsed_time(t1sort)/1e3} secs")
+
+    if timing:  
+        t1.record()
+        torch.cuda.synchronize()
+        dt = t0.elapsed_time(t1)/1e3
+        print(f"Preloaded {len(data_list)} TUMVIE voxels in {dt} secs, e.g. {len(data_list)/dt} FPS")
+    print(f"Preloaded {len(data_list)} TUMVIE voxels, imstart={0}, imstop={-1}, stride={stride}, dT_ms={dT_ms} on {scenedir}")
+
+    evs.close()
+
+    for (voxel, intrinsics, ts_us) in data_list:
+        yield voxel.cuda(), intrinsics.cuda(), ts_us    
 
 def tumvie_evs_iterator(scenedir, camID=2, stride=1, rectify_map=None, H=720, W=1280, dT_ms=None, timing=False, parallel=False, cors=16):
     assert camID == 2 or camID == 3
