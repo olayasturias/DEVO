@@ -93,10 +93,11 @@ def uw_evs_iterator(scenedir, camID=2, stride=1, rectify_map=None, H=720, W=1280
     assert camID == 2 or camID == 3
     side = "left" if camID == 2 else "right"
     
-    intrinsics = load_intrinsics_tumvie(scenedir, camID=camID)
-    rectify_map = load_rmap_tumvie(scenedir, side=side)
+    intrinsics = load_intrinsics_uw(scenedir, camID=camID)
+    # rectify_map = load_rmap_tumvie(scenedir, side=side)
+    rectify_map = None
 
-    h5file = glob.glob(osp.join(scenedir, f"*events_{side}.h5"))[0]
+    h5file = glob.glob(osp.join(scenedir, "bag_converted.h5"))[0]
     evs = h5py.File(h5file, "r")
     evs_slicer = EventSlicer(evs)
 
